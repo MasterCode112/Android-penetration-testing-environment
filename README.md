@@ -1,6 +1,6 @@
-# AndroPentestKit
+# Android-penetration-testing-environment
 
-**AndroPentestKit** is an automated setup script for preparing a complete **Android penetration testing environment**.  
+**Android-penetration-testing-environment** is an automated setup script for preparing a complete **Android penetration testing environment**.  
 It downloads, installs, and configures popular tools, APKs, and modules for Android app security testing.
 
 ---
