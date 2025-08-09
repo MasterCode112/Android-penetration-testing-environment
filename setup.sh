@@ -46,6 +46,7 @@ wget -q --show-progress https://github.com/kdrag0n/safetynet-fix/releases/downlo
 wget -q --show-progress https://github.com/chiteroman/PlayIntegrityFix/releases/download/v19.0/PlayIntegrityFix_v19.0.zip
 wget -q --show-progress https://github.com/Dr-TSNG/Hide-My-Applist/releases/download/V3.4/HMA-V3.4.r436.d03edf7-release.zip
 wget -q --show-progress https://github.com/5ec1cff/TrickyStore/archive/refs/heads/release.zip -O TrickyStore.zip
+wget -q --show-progress https://github.com/fatalSec/flutter_reversing/raw/refs/heads/main/funnybones.apk -o testFridaSllPinin.apk
 
 echo "[+] Installing dependencies..."
 sudo apt update
