@@ -18,7 +18,5 @@ It downloads, installs, and configures popular tools, APKs, and modules for Andr
 
 ## 📦 Installation
 ```bash
-git clone https://github.com/mastercode112/AndroPentestKit.git
-cd AndroPentestKit
-chmod +x setup.sh
-./setup.sh
+curl -fsSL https://raw.githubusercontent.com/MasterCode112/Android-penetration-testing-environment/main/setup.sh | bash -s -- -euo pipefail
+```
