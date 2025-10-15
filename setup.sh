@@ -20,7 +20,7 @@ print_logo() {
   echo " | |\/| |/ _ \ / _\` |/ _ \| '_ \| |/ __/ _ \   / _ \   | |/ _ \ / __| | "
   echo " | |  | | (_) | (_| | (_) | | | | | (_|  __/  / ___ \  | | (_) | (__|_| "
   echo " |_|  |_|\___/ \__,_|\___/|_| |_|_|\___\___| /_/   \_\ |_|\___/ \___(_) "
-  echo -e "${GREEN}        MasterCode Android Penetration Testing Environment${NC}\n"
+  echo -e "${GREEN}        MasterCode Android Penetration Testing Environment.${NC}\n"
 }
 
 # Utilities
