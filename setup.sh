@@ -3,8 +3,11 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # -----------------------------
-# MasterCode Android Penetration Testing Environment
+# MasterCode Android Pentest Environment (quiet mode)
 # -----------------------------
+
+# Toggle verbosity: set VERBOSE=1 to see full command output, otherwise it's quiet.
+VERBOSE=${VERBOSE:-0}
 
 # Color codes
 RED='\033[0;31m'
@@ -12,6 +15,9 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
+
+WORKDIR="$HOME/Android-pentest-tool"
+LOGFILE="$WORKDIR/install.log"
 
 print_logo() {
   echo -e "${CYAN}"
@@ -23,8 +29,79 @@ print_logo() {
   echo -e "${GREEN}        MasterCode Android Penetration Testing Environment${NC}\n"
 }
 
-# Utilities
 command_exists() { command -v "$1" >/dev/null 2>&1; }
+
+# Run a command quietly, log output, show friendly messages.
+# Arguments:
+#  $1 = short message to show (e.g., "Installing packages")
+#  $2... = command to run
+run_quiet() {
+  local msg="$1"; shift
+  printf "%-60s" "${msg}..."
+  if [ "$VERBOSE" -eq 1 ]; then
+    # verbose: show and log
+    echo "" >> "$LOGFILE"
+    echo "=== RUN: $msg ===" | tee -a "$LOGFILE"
+    if "$@"; then
+      echo -e "${GREEN}done${NC}"
+      echo "=== OK: $msg ===" >> "$LOGFILE"
+      return 0
+    else
+      echo -e "${RED}FAILED${NC}"
+      echo "=== FAIL: $msg ===" >> "$LOGFILE"
+      echo -e "${YELLOW}Last 40 lines of log:${NC}"
+      tail -n 40 "$LOGFILE"
+      exit 1
+    fi
+  else
+    # quiet: redirect stdout/stderr to log file
+    echo "" >> "$LOGFILE"
+    echo "=== RUN: $msg ===" >> "$LOGFILE"
+    if "$@" >> "$LOGFILE" 2>&1; then
+      echo -e "${GREEN}done${NC}"
+      echo "=== OK: $msg ===" >> "$LOGFILE"
+      return 0
+    else
+      echo -e "${RED}FAILED${NC}"
+      echo "=== FAIL: $msg ===" >> "$LOGFILE"
+      echo -e "${YELLOW}Last 40 lines of log:${NC}"
+      tail -n 40 "$LOGFILE"
+      exit 1
+    fi
+  fi
+}
+
+# Run a command quietly but don't exit on failure; report failure and continue.
+run_quiet_allow_fail() {
+  local msg="$1"; shift
+  printf "%-60s" "${msg}..."
+  if [ "$VERBOSE" -eq 1 ]; then
+    echo "" >> "$LOGFILE"
+    echo "=== RUN (may fail): $msg ===" | tee -a "$LOGFILE"
+    if "$@"; then
+      echo -e "${GREEN}done${NC}"
+      echo "=== OK: $msg ===" >> "$LOGFILE"
+      return 0
+    else
+      echo -e "${YELLOW}warning${NC}"
+      echo "=== WARN: $msg ===" >> "$LOGFILE"
+      return 1
+    fi
+  else
+    echo "" >> "$LOGFILE"
+    echo "=== RUN (may fail): $msg ===" >> "$LOGFILE"
+    if "$@" >> "$LOGFILE" 2>&1; then
+      echo -e "${GREEN}done${NC}"
+      echo "=== OK: $msg ===" >> "$LOGFILE"
+      return 0
+    else
+      echo -e "${YELLOW}warning${NC}"
+      echo "=== WARN: $msg ===" >> "$LOGFILE"
+      return 1
+    fi
+  fi
+}
+
 ensure_sudo() {
   if [ "$EUID" -ne 0 ] && ! command_exists sudo; then
     echo -e "${RED}ERROR:${NC} This script requires 'sudo' or root privileges to install system packages."
@@ -32,10 +109,7 @@ ensure_sudo() {
   fi
 }
 
-# Target working dir
-WORKDIR="$HOME/Android-pentest-tool"
-
-# Repositories and downloads (array of "url:outname" or just "url")
+# --- your lists (unchanged) ---
 REPOS=(
   "https://gitlab.com/newbit/rootAVD.git"
   "https://github.com/raoshaab/Pen-Andro.git"
@@ -62,7 +136,6 @@ DOWNLOADS=(
   "https://github.com/fatalSec/flutter_reversing/raw/refs/heads/main/funnybones.apk"
 )
 
-# System packages we want to ensure installed (apt-based)
 SYS_PKGS=(wget git unzip xz-utils adb python3-pip python3-dev build-essential google-android-platform-tools-installer pipx)
 
 main() {
@@ -71,15 +144,14 @@ main() {
   echo -e "${GREEN}[+]${NC} Preparing working directory: ${WORKDIR}"
   mkdir -p "$WORKDIR"
   cd "$WORKDIR"
+  # reset log file
+  : > "$LOGFILE"
 
-  # Ensure sudo is available (for non-root users)
   ensure_sudo
 
-  # Find missing system packages
-  echo -e "${GREEN}[+]${NC} Checking required system packages..."
+  # Check which system packages are missing
   PKGS_TO_INSTALL=()
   for pkg in "${SYS_PKGS[@]}"; do
-    # map some commands to package names for quick check
     case "$pkg" in
       wget) check_cmd="wget" ;;
       git) check_cmd="git" ;;
@@ -98,47 +170,44 @@ main() {
   done
 
   if [ "${#PKGS_TO_INSTALL[@]}" -gt 0 ]; then
-    echo -e "${YELLOW}[i]${NC} Missing packages: ${PKGS_TO_INSTALL[*]}"
-    echo -e "${GREEN}[+]${NC} Updating package lists and installing missing packages..."
-    sudo apt-get update -y
-    sudo apt-get install -y "${PKGS_TO_INSTALL[@]}"
+    run_quiet "Updating apt lists" sudo DEBIAN_FRONTEND=noninteractive apt-get -qq update
+    run_quiet "Installing system packages: ${PKGS_TO_INSTALL[*]}" \
+      sudo DEBIAN_FRONTEND=noninteractive apt-get -qq install -y "${PKGS_TO_INSTALL[@]}"
+    echo -e "${GREEN}[+]${NC} Installed system packages."
   else
-    echo -e "${GREEN}[+]${NC} All required system packages appear to be installed."
+    echo -e "${GREEN}[+]${NC} All required system packages already present."
   fi
 
-  # Ensure pipx present & frida-tools installed via pipx
+  # pipx install (quiet)
   if ! command_exists pipx; then
-    echo -e "${YELLOW}[i]${NC} pipx not found, attempting to install via pip..."
-    python3 -m pip install --user pipx || true
-    python3 -m pipx ensurepath || true
+    run_quiet_allow_fail "Installing pipx (user pip)" python3 -m pip install --user pipx
+    run_quiet_allow_fail "Ensuring pipx path" python3 -m pipx ensurepath || true
     export PATH="$HOME/.local/bin:$PATH"
   fi
 
-  if ! command_exists pipx; then
-    echo -e "${RED}ERROR:${NC} pipx installation failed. Please install pipx manually and re-run."
-  else
-    pipx ensurepath || true
-    if ! pipx list | grep -q frida-tools; then
-      echo -e "${GREEN}[+]${NC} Installing frida-tools via pipx..."
-      pipx install frida-tools || echo -e "${YELLOW}[!]${NC} pipx install frida-tools failed (continue)."
+  # ensure pipx is present before using it
+  if command_exists pipx; then
+    if ! pipx list 2>/dev/null | grep -q frida-tools; then
+      run_quiet "Installing frida-tools via pipx" pipx install frida-tools
     else
       echo -e "${GREEN}[+]${NC} frida-tools already installed via pipx."
     fi
+  else
+    echo -e "${YELLOW}[!]${NC} pipx not available; please install pipx manually to manage frida-tools."
   fi
 
-  # Clone repos (skip if directory exists)
+  # Clone repos quietly
   echo -e "${GREEN}[+]${NC} Cloning repositories..."
   for repo in "${REPOS[@]}"; do
     dir=$(basename "${repo}" .git)
     if [ -d "$dir" ]; then
-      echo " - Skipping ${dir} (already present)"
-    else
-      echo " - Cloning ${repo} ..."
-      git clone --depth 1 "$repo" || echo -e "${YELLOW}[!]${NC} git clone failed for $repo (continuing)."
+      echo " - ${dir}: skipped (already present)"
+      continue
     fi
+    run_quiet "Cloning ${dir}" git clone --depth 1 "$repo"
   done
 
-  # Download files
+  # Download files quietly
   echo -e "${GREEN}[+]${NC} Downloading artifacts..."
   for item in "${DOWNLOADS[@]}"; do
     url="${item%%::*}"
@@ -147,28 +216,24 @@ main() {
     filename="${out:-$(basename "$url")}"
 
     if [ -f "$filename" ]; then
-      echo " - Skipping $filename (already exists)"
+      echo " - $filename: skipped (exists)"
       continue
     fi
 
-    echo " - Downloading: $url -> $filename"
-    # using -c to allow resume; --show-progress provides a progress bar
-    if ! wget -c --show-progress "$url" -O "$filename"; then
-      echo -e "${YELLOW}[!]${NC} wget failed for $url (you may want to retry manually)."
+    # Use wget quiet; resume support with -c.
+    run_quiet_allow_fail "Downloading $(basename "$filename")" wget -c -q "$url" -O "$filename"
+    if [ -f "$filename" ]; then
+      echo " - $filename: saved"
+    else
+      echo -e "${YELLOW}[!]${NC} $filename not present after download attempt."
     fi
   done
 
-  # Minor convenience: rename the downloaded Xposed module apk if necessary
-  if [ -f "app-release.apk" ] && [ ! -f "am_not_developer.apk" ]; then
-    mv -n app-release.apk am_not_developer.apk || true
-  fi
-
-  echo -e "${GREEN}[+]${NC} All tasks attempted. Please verify files in: ${WORKDIR}"
+  echo -e "${GREEN}[+]${NC} All tasks attempted. Log saved to: ${LOGFILE}"
   echo -e "${GREEN}[+]${NC} Next recommended steps:"
   echo "  - Inspect downloaded scripts/APKs before installing on devices."
   echo "  - Verify checksums/signatures where available."
-  echo "  - To inspect APK versionCode/versionName: use 'aapt dump badging <APK>' (requires Android build-tools)."
-
+  echo "  - For debugging re-run with VERBOSE=1 to see full logs in the terminal."
   echo -e "${GREEN}[+] Setup finished.${NC}"
 }
 
