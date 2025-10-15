@@ -5,7 +5,7 @@ It downloads, installs, and configures popular tools, APKs, and modules for Andr
 
 ---
 
-## ✨ Features
+## Features
 - Downloads popular Android pentesting tools & APKs:
   - **Frida**, **Frida-Multiple-Bypass**, **MagiskTrustUserCerts**
   - **LSPosed** (Zygisk & Riru), **Shamiko**, **SafetyNet Fix**
@@ -16,7 +16,7 @@ It downloads, installs, and configures popular tools, APKs, and modules for Andr
 
 ---
 
-## 📦 Installation
+## Installation
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MasterCode112/Android-penetration-testing-environment/main/setup.sh | bash -s -- -euo pipefail
+$ sudo curl -fsSL https://raw.githubusercontent.com/MasterCode112/Android-penetration-testing-environment/main/setup.sh | bash -s -- -euo pipefail
 ```
